@@ -4,22 +4,23 @@ How to run the suite at each layer. Fill each section when its phase lands.
 
 ## Prerequisites
 
-| Tool | Version | Check command |
+| Tool | Version (2026-10-11) | Check command |
 |---|---|---|
-| Docker Desktop | | |
-| kind | | |
-| kubectl | | |
-| Java | | |
-| Maven | | |
+| Docker Desktop (engine) | 29.8.2 | `docker --version`, `docker info` |
+| kind | 0.33.0 | `kind version` |
+| kubectl | client 1.36.1, server 1.37.0 | `kubectl version` (no skew warning) |
+| Java | 21.0.9 LTS | `java -version` |
+| Maven | 3.10.0 | `mvn -v` |
 
 ## Cluster lifecycle (kind)
 
 | Action | Command |
 |---|---|
-| Create | |
-| Start after reboot | |
-| Check health | |
-| Delete | |
+| Create | `kind create cluster --name nk --config kind-config.yml` |
+| Start after reboot | Start Docker Desktop; if the node is still down: `docker start nk-control-plane` |
+| Check health | `kubectl get nodes` (expect `nk-control-plane Ready`) |
+| Check reports mount | `docker exec nk-control-plane ls /reports` |
+| Delete | `kind delete cluster --name nk` |
 
 ## Local
 
@@ -57,4 +58,5 @@ How to run the suite at each layer. Fill each section when its phase lands.
 
 | Symptom | Likely cause | Fix | BUGLOG # |
 |---|---|---|---|
-| `connection refused` on 127.0.0.1:<port> | kind container stopped | | 2 |
+| `connection refused` on 127.0.0.1:<port> | kind container stopped | Start Docker Desktop / `docker start nk-control-plane` | 2 |
+| kubectl version skew warning | Older kubectl first on PATH | `where.exe kubectl`; use a kubectl within +/-1 minor of the server | 1 |

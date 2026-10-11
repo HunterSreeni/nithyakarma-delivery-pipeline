@@ -2,44 +2,59 @@
 
 ## Rule
 
-<!-- One or two sentences: the service-role/secret key bypasses RLS (full DB access). It never enters Git, browser code, screenshots, logs, or reports. -->
+The Supabase service-role key bypasses Row Level Security and has full access to the production database. It never enters Git, browser code, Docker image layers, screenshots, logs, or reports. Tests use it only for setup and cleanup, never for assertions.
 
 ## Secrets inventory
 
-| Secret | What it grants | Who/what uses it | Sensitivity (high/medium/low) |
+| Secret | What it grants | Who/what uses it | Sensitivity |
 |---|---|---|---|
-| `SUPABASE_SERVICE_ROLE_KEY` | | | |
-| `SUPABASE_PUBLISHABLE_KEY` | | | |
-| User A / B session tokens (JWTs) | | | |
-| GHCR push token | | | |
-| SonarQube token | | | |
-| kubeconfig | | | |
+| `SUPABASE_SERVICE_ROLE_KEY` | Full DB read/write, bypasses RLS; admin auth API (mint magic links) | Test setup/cleanup only: create sessions, look up user B's IDs, verify B's rows unchanged, restore state | **High** |
+| `SUPABASE_PUBLISHABLE_KEY` | Identifies the project to the API; everything else is limited by RLS. Public by design (ships in the app's browser bundle) | REST Assured requests (`apikey` header), session setup | Low (still kept out of Git for hygiene) |
+| User A / B session tokens (JWTs) | Act as that user until expiry | Minted at runtime per test class, held in memory only | **High** while valid |
+| GHCR push token | Push images to the GitHub Container Registry | Jenkins image push stage (Phase 6) | Medium |
+| SonarQube token | Submit analysis to SonarQube | Jenkins Sonar stage (Phase 6) | Low (local Sonar only) |
+| kubeconfig | Admin access to the local kind cluster | Jenkins deploy/run stages | Medium (local cluster only) |
 
 ## Where each secret lives, per layer
 
-| Secret | Local (`.env`) | Docker (runtime env) | Kubernetes (Secret) | Jenkins (credential ID) |
+| Secret | Local | Docker | Kubernetes | Jenkins credential ID |
 |---|---|---|---|---|
-| `SUPABASE_SERVICE_ROLE_KEY` | | | | |
-| `SUPABASE_PUBLISHABLE_KEY` | | | | |
-| GHCR push token | | | | |
-| SonarQube token | | | | |
-| kubeconfig | | | | |
+| `SUPABASE_SERVICE_ROLE_KEY` | `.env` (git-ignored) | `--env-file .env` at `docker run`, never `ENV` in Dockerfile | Secret `nk-test-secrets`, injected as env | `nk-supabase-service-role` (Secret text) |
+| `SUPABASE_PUBLISHABLE_KEY` | `.env` | runtime env | Secret `nk-test-secrets` | `nk-supabase-publishable` (Secret text) |
+| User A / B JWTs | memory only | memory only | memory only | never stored |
+| GHCR push token | not needed | `docker login` on the Jenkins host only | not needed (public package) | `nk-ghcr-token` (Username + password) |
+| SonarQube token | not needed | not needed | not needed | `nk-sonar-token` (Secret text) |
+| kubeconfig | `~/.kube/config` (from kind) | not needed | not applicable | `nk-kubeconfig` (Secret file, internal kind address) |
+
+The Kubernetes Secret is created by Jenkins from its credentials on every run (`kubectl create secret ... --dry-run=client -o yaml | kubectl apply -f -`). No Secret manifest with real values is ever committed.
 
 ## What must never contain a secret
 
-<!-- List: Git history, Docker image layers, test code, browser localStorage dumps, screenshots, console/network captures, JUnit/HTML reports, Jenkins console output -->
+- Git history (including `.env`, kubeconfig, Secret manifests)
+- Docker image layers (`docker history` must show none)
+- Test code and config files
+- Browser localStorage dumps and screenshots
+- Raw BiDi console and network captures (they hold JWTs, `apikey` headers, magic-link URLs)
+- JUnit / HTML / Allure reports
+- Jenkins console output and archived artifacts
+- README screenshots and the case study
 
 ## Controls
 
 | Control | How it is enforced | How it is checked |
 |---|---|---|
-| `.env` never committed | | |
-| No secrets in image layers | | |
-| Jenkins masks credentials in logs | | |
-| Token scrubber on console/network captures | | |
-| Raw captures never archived | | |
-| Service role used for setup/cleanup only, never for assertions | | |
+| `.env` never committed | `.gitignore`; only `.env.example` with placeholders is tracked | `git ls-files` shows no `.env`; review before each push |
+| No secrets in image layers | Secrets passed at runtime only; `.dockerignore` excludes `.env` | `docker history --no-trunc` on the runner image |
+| Jenkins masks credentials in logs | `withCredentials` bindings only | Search build logs for key prefixes |
+| Token scrubber on console/network captures | Scrubber runs before any capture is written to reports | Unit test feeds a fake JWT, `apikey` header and magic link, asserts all redacted |
+| Raw captures never archived | Raw files stay in the pod / temp folder; only scrubbed files archived | Inspect archived artifacts after each phase |
+| Service role for setup/cleanup only | Assertions use user A/B JWTs | Code review; RLS tests proven to fail when pointed at A's own data |
+| Writes off by default | `E2E_ALLOW_DATA_WRITES=false` locally and in Jenkins | Default build run shows write tests SKIPPED |
 
 ## If a secret leaks
 
-<!-- Steps: rotate the key in Supabase, revoke/replace Jenkins credential and K8s Secret, purge from Git history if committed, check Supabase logs for misuse, note it in BUGLOG.md -->
+1. Rotate the key in the Supabase dashboard immediately (service-role key first).
+2. Update the Jenkins credential and local `.env`; the next run recreates the K8s Secret.
+3. If it was committed: remove it from Git history and force-push; treat the old key as compromised regardless.
+4. Check Supabase logs for unexpected requests since the leak.
+5. Record it in BUGLOG.md: what leaked, where, how it was caught, what changed to stop it happening again.
