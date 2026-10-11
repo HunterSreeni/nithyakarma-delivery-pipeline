@@ -1,5 +1,6 @@
 .env
 target/
 reports/
+!reports/placeholder.txt
 *.log
 .idea/
