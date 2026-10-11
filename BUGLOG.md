@@ -10,6 +10,7 @@ This file is the raw material for the case study.
 | 1 | 2026-10-11 | 0 | kubectl | Client/server version skew warning |
 | 2 | 2026-10-11 | 0 | kind | API server connection refused |
 | 3 | 2026-10-11 | 0 | git | Reports placeholder ignored by Git |
+| 4 | 2026-10-11 | 0 | test data | RLS probe ran as the wrong user |
 
 ---
 
@@ -49,6 +50,15 @@ This file is the raw material for the case study.
 - **Phase:** 0
 - **Symptom:** `reports/placeholder.txt` never appeared in `git status`, even with `!reports/placeholder.txt` in `.gitignore`. `git check-ignore -v reports/placeholder.txt` -> `.gitignore:3:reports/`.
 - **Cause:** `reports/` ignores the directory itself. Git does not look inside an ignored directory, so a negation rule for a file inside it can never apply.
-- **Fix:**
-- **How I verified:**
+- **Fix:** changed `reports/` to `reports/*` in `.gitignore`, keeping `!reports/placeholder.txt`.
+- **How I verified:** `git check-ignore -v reports/placeholder.txt` prints nothing; `git ls-files reports` -> `reports/placeholder.txt`.
 - **Lesson:** to keep one file in an ignored folder, ignore the folder's contents (`folder/*`), not the folder (`folder/`). A fresh clone (or Jenkins) needs the folder to exist for the kind mount.
+
+### 4. RLS probe ran as the wrong user
+- **Date:** 2026-10-11
+- **Phase:** 0
+- **Symptom:** SQL probe "A reads own children" returned 2 rows, but the app showed 4 children for A.
+- **Cause:** the emails for `probe.a` and `probe.b` were swapped, so the probe impersonated B (2 children) instead of A (4). The RLS results were still correct, just from the wrong side.
+- **Fix:** swapped the emails and re-ran the probes.
+- **How I verified:** `select count(*) from family_members where parent_id = '<id>'` per user -> A = 4, B = 2; re-run probe as A -> `1, 0, 4, 0`.
+- **Lesson:** cross-check every probe against a known baseline value; a passing security check run as the wrong identity proves nothing about the identity you meant.

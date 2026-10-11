@@ -47,15 +47,16 @@ Source: Supabase MCP, schema + `pg_policies` + column grants, 2026-10-11.
 
 | # | Request (as user A) | Target | Expected | Observed status | Observed body | Date |
 |---|---|---|---|---|---|---|
-| 1 | GET `profiles?select=id` (no filter) | all | only A's row | | | |
-| 2 | GET `profiles?id=eq.<B>` | B | `[]` | | | |
-| 3 | GET `family_members?select=*` | A | A's children only | | | |
-| 4 | GET `family_members?parent_id=eq.<B>` | B | `[]` | | | |
-| 5 | PATCH `profiles?id=eq.<B>` (Phase 1) | B | 0 rows, B unchanged | | | |
-| 6 | INSERT `family_members` with `parent_id=<B>` (Phase 1) | B | 42501 | | | |
-| 7 | INSERT `practice_logs` directly, own row (Phase 1) | A | 42501 (no insert policy) | | | |
+| 1 | GET `profiles?select=id` (no filter) | all | only A's row | SQL ok | 1 row | 2026-10-11 |
+| 2 | GET `profiles?id=eq.<B>` | B | `[]` | SQL ok | 0 rows | 2026-10-11 |
+| 3 | GET `family_members?select=*` | A | A's children only | SQL ok | 4 rows (matches app) | 2026-10-11 |
+| 4 | GET `family_members?parent_id=eq.<B>` | B | `[]` | SQL ok | 0 rows | 2026-10-11 |
+| 5 | PATCH `profiles?id=eq.<B>` | B | 0 rows, B unchanged | SQL ok | 0 rows updated | 2026-10-11 |
+| 6 | INSERT `family_members` with `parent_id=<B>` | B | 42501 | 42501 | `new row violates row-level security policy for table "family_members"` | 2026-10-11 |
+| 7 | INSERT `practice_logs` directly, own row | A | 42501 (no insert policy) | 42501 | `new row violates row-level security policy for table "practice_logs"` | 2026-10-11 |
+| T15 | PATCH own `profiles.punya` | A | rejected | **allowed (1 row updated) - bug confirmed** | n/a | 2026-10-11 |
 
-Expected column = derived from the policies above. Observed columns are filled from real requests before any assertion is written.
+Expected column = derived from the policies above. Observed 2026-10-11 by SQL Editor as A (`set local role authenticated` + `request.jwt.claims`, inside `begin ... rollback`, so no data changed). This proves the database rules; HTTP status codes are recorded when T11/T12 first run through the API in Phase 1.
 
 ## What each test reads / writes
 
@@ -82,5 +83,5 @@ Recorded 2026-10-11. Every run must leave A and B exactly like this.
 
 | User | Children | Tracked anushtanams | Leaderboard opt-in | Today's sandhya slots |
 |---|---|---|---|---|
-| A | 4 | 4 | to confirm | unmarked before a run |
-| B | 2 | to confirm | to confirm | not touched by tests |
+| A | 4 | 4 | ON | unmarked before a run |
+| B | 2 | 5 | ON | not touched by tests |
