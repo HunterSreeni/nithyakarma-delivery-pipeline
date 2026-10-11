@@ -1,0 +1,1 @@
+Quality Lab compares Playwright and Selenium test coverage. Nithyakarma Delivery Pipeline focuses on running a curated Java/Selenium and REST Assured suite through Jenkins, Docker, SonarQube, and Kubernetes against the live Nithyakarma PWA
