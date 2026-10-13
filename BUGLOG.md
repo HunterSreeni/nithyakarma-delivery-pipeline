@@ -15,6 +15,7 @@ This file is the raw material for the case study.
 | 6 | 2026-10-13 | 1 | test data | Write-test cleanup refused (HTTP 403) |
 | 7 | 2026-10-13 | 3 | docker | Chrome container started without its ports |
 | 8 | 2026-10-13 | 3 | shell | PowerShell broke Maven `-D` arguments |
+| 9 | 2026-10-13 | 4 | kind | `kind load` failed for the Chrome image |
 
 ---
 
@@ -103,3 +104,12 @@ This file is the raw material for the case study.
 - **Fix:** quote those arguments: `"-Dsurefire.failIfNoSpecifiedTests=false"`, `"-Dtest=DashboardTest,ResilienceTest"`. RUNBOOK commands updated.
 - **How I verified:** both commands ran; DashboardTest + ResilienceTest passed (4/4) in a `maven` container against `nk-chrome`.
 - **Lesson:** the shell is part of the pipeline; write commands for the shell the CI agent actually uses (Jenkins on Linux = sh).
+
+### 9. `kind load` failed for the Chrome image
+- **Date:** 2026-10-13
+- **Phase:** 4
+- **Symptom:** `kind load docker-image selenium/standalone-chrome:4.49.0-20260909 --name nk` -> `ctr: content digest sha256:66e7ec5c...: not found`. `kind load` of `nk-runner:0.1.0` worked.
+- **Cause:** Docker Desktop uses the containerd image store. The Selenium image is multi-platform (amd64 + arm64) and only the amd64 layers were downloaded locally, but `kind load` exports the whole image index and imports it with `--all-platforms`, so the arm64 layers it points to are missing. `nk-runner` is built locally for one platform, so it has no such gap.
+- **Fix:** let the node pull the image itself: `docker exec nk-control-plane crictl pull selenium/standalone-chrome:4.49.0-20260909`. The Job uses `imagePullPolicy: IfNotPresent`.
+- **How I verified:** `docker exec nk-control-plane crictl images` lists both images; the Job ran 22 / 19 passed / 3 skipped.
+- **Lesson:** a kind node is a container running containerd; `docker exec` + `crictl` work on it like SSH on a real node. `kind load` suits locally built images; public multi-platform images are simpler to pull on the node.

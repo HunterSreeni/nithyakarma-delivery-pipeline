@@ -1,0 +1,53 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nk-e2e
+  namespace: nk-e2e
+spec:
+  backoffLimit: 0                # never auto-retry a run against production data
+  activeDeadlineSeconds: 1800    # kill a hung run after 30 min
+  template:
+    spec:
+      restartPolicy: Never
+      initContainers:
+        - name: chrome           # native sidecar: starts first, stopped when the runner ends
+          image: selenium/standalone-chrome:4.49.0-20260909
+          imagePullPolicy: IfNotPresent
+          restartPolicy: Always
+          env:
+            - name: TZ
+              value: Asia/Kolkata
+          startupProbe:          # runner starts only after the Grid answers
+            httpGet:
+              path: /status
+              port: 4444
+            periodSeconds: 2
+            failureThreshold: 60
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+      containers:
+        - name: runner
+          image: nk-runner:0.1.0
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef:
+                name: nk-env     # the K8s version of --env-file
+          env:
+            - name: SELENIUM_REMOTE_URL
+              value: http://localhost:4444   # same pod = same network
+          volumeMounts:
+            - name: reports
+              mountPath: /work/reports
+            - name: reports
+              mountPath: /work/target/surefire-reports
+              subPath: surefire
+      volumes:
+        - name: dshm             # replaces docker's --shm-size=2g
+          emptyDir:
+            medium: Memory
+            sizeLimit: 2Gi
+        - name: reports          # node's /reports = your repo's reports\ (kind-config.yml)
+          hostPath:
+            path: /reports
+            type: Directory

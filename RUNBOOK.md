@@ -54,12 +54,16 @@ How to run the suite at each layer. Fill each section when its phase lands.
 
 ## Kubernetes
 
-- **Create/refresh Secret:**
-- **Run Job:**
-- **Wait for result:**
-- **Get logs:**
-- **Reports at:**
-- **Clean up:**
+- **Load images onto the node (after each rebuild):** `kind load docker-image nk-runner:0.1.0 --name nk`; Chrome (multi-platform, `kind load` fails, BUGLOG #9): `docker exec nk-control-plane crictl pull selenium/standalone-chrome:4.49.0-20260909`
+- **Check node images:** `docker exec nk-control-plane crictl images`
+- **Namespace (once):** `kubectl create namespace nk-e2e`
+- **Create/refresh Secret:** `kubectl -n nk-e2e delete secret nk-env --ignore-not-found`, then `kubectl -n nk-e2e create secret generic nk-env --from-env-file=.env`. Check keys (never values): `kubectl -n nk-e2e describe secret nk-env`
+- **Run Job:** `kubectl -n nk-e2e delete job nk-e2e --ignore-not-found`, then `kubectl apply -f k8s\e2e-job.yml` (Jobs are immutable; delete before re-running)
+- **Wait for result:** `kubectl -n nk-e2e get pods -w`, then `kubectl -n nk-e2e get job nk-e2e` -> `Complete` (tests failed -> `Failed`; `backoffLimit: 0`, never auto-retried)
+- **Get logs:** `kubectl -n nk-e2e logs -f job/nk-e2e -c runner`
+- **Reports at:** repo `reports\surefire\` (TestNG/JUnit XML + HTML) and `reports\console\` (via node mount `/reports`, kind-config.yml)
+- **Expected result (2026-10-13):** 22 run, 19 passed, 3 skipped, ~80s (Chrome is a native sidecar on `localhost:4444`)
+- **Clean up:** `kubectl -n nk-e2e delete job nk-e2e`
 
 ## Jenkins
 
