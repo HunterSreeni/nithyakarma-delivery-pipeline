@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+<!-- DAG demo: the SAME test code as regression, but group dependencies are declared here,
+     so ordering and skipping only exist in this suite.
+     public (T1-T4) -> session (T5) -> features (T6-T13) -> logout (T14)
+     Break T5 on purpose:  mvn test -Dsuite=testng-dag.xml -Ddag.breakSession=true
+     Expected: T5 FAILED, T6-T14 SKIPPED. -->
+<suite name="nithyakarma-dag-demo">
+<test name="dag">
+    <groups>
+        <dependencies>
+            <group name="session" depends-on="public"/>
+            <group name="features" depends-on="session"/>
+            <group name="logout" depends-on="features"/>
+        </dependencies>
+        <run>
+            <exclude name="known-bug"/>
+        </run>
+    </groups>
+    <packages>
+        <package name="org.nithyakarma.pipeline.tests"/>
+    </packages>
+</test>
+</suite>

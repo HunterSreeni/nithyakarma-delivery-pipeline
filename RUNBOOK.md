@@ -24,12 +24,19 @@ How to run the suite at each layer. Fill each section when its phase lands.
 
 ## Local
 
-- **Setup:**
-- **Run regression suite:**
-- **Run DAG demo suite:**
-- **Enable writes:**
-- **Expected result:**
-- **Reports at:**
+- **Setup:** copy `.env.example` to `.env`, fill it in, then load it into the PowerShell window (once per window):
+  `Get-Content .env | ? { $_ -match '^[A-Z_]+=' } | % { $k,$v = $_ -split '=',2; Set-Item "env:$k" $v }`
+- **Run regression suite:** `mvn test` (default suite `testng-regression.xml`, ~6 min)
+- **Run one class:** `mvn test -Dtest=RlsTest -Dsurefire.failIfNoSpecifiedTests=false`
+- **Run DAG demo suite:** `mvn test -Dsuite=testng-dag.xml`; add `-Ddag.breakSession=true` to break T5 on purpose
+- **Run known bugs (T15, expected to FAIL):** `$env:E2E_ALLOW_DATA_WRITES="true"; mvn test -Dsuite=testng-known-bugs.xml`
+- **Enable writes:** `$env:E2E_ALLOW_DATA_WRITES="true"` (T8, T9, T12 run instead of skipping; they restore A afterwards)
+- **Watch the browser:** `$env:HEADLESS="false"`
+- **Expected result (2026-10-13):**
+  - Regression, writes off: 22 run (T2 counts 7 rows), 19 passed, 3 skipped (T8, T9, T12).
+  - Writes on: T8, T9, T12 pass, and A matches the TEST-DATA baseline afterwards.
+  - DAG with break: T5 FAILED, T6-T14 SKIPPED.
+- **Reports at:** `target/surefire-reports/` (TestNG + JUnit XML); scrubbed browser console of failed UI tests in `reports/console/`
 
 ## Docker
 

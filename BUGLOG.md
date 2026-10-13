@@ -11,6 +11,8 @@ This file is the raw material for the case study.
 | 2 | 2026-10-11 | 0 | kind | API server connection refused |
 | 3 | 2026-10-11 | 0 | git | Reports placeholder ignored by Git |
 | 4 | 2026-10-11 | 0 | test data | RLS probe ran as the wrong user |
+| 5 | 2026-10-13 | 1 | BiDi | Request intercept hung the test for 4 minutes |
+| 6 | 2026-10-13 | 1 | test data | Write-test cleanup refused (HTTP 403) |
 
 ---
 
@@ -62,3 +64,22 @@ This file is the raw material for the case study.
 - **Fix:** swapped the emails and re-ran the probes.
 - **How I verified:** `select count(*) from family_members where parent_id = '<id>'` per user -> A = 4, B = 2; re-run probe as A -> `1, 0, 4, 0`.
 - **Lesson:** cross-check every probe against a known baseline value; a passing security check run as the wrong identity proves nothing about the identity you meant.
+
+### 5. Request intercept hung the test for 4 minutes
+- **Date:** 2026-10-13
+- **Phase:** 1
+- **Symptom:** T10 (`ResilienceTest`) ran 240s and failed with `java.util.concurrent.TimeoutException` thrown from inside the `onBeforeRequestSent` callback; `Exception in thread "BiDi Connection"`.
+- **Cause:** the callback called `network.failRequest()` / `continueRequest()`. BiDi events are delivered on the connection's own thread, and a BiDi command waits for its reply on that same thread, so the command could never complete (deadlock). Intercepting every request made it worse: every page request paused.
+- **Fix:** intercept only the target URL (`UrlPattern` host + path), and send `failRequest` from a separate single-thread executor. Remove the intercept in `finally`; `Network.close()` does not remove it.
+- **How I verified:** `mvn test -Dtest=ResilienceTest` passes in seconds; the "requests failed" counter is positive.
+- **Lesson:** never send a BiDi/WebSocket command from inside its own event callback; hand it to another thread.
+
+### 6. Write-test cleanup refused (HTTP 403)
+- **Date:** 2026-10-13
+- **Phase:** 1
+- **Symptom:** with writes on, T8/T9/T12 failed with `restore profiles failed: HTTP 403` / `clean up practice_logs failed: HTTP 403`. Test account A was left with +5 punya, streak 1 and one extra practice log.
+- **Cause:** the plan assumed the service-role key can write everything. In this project `service_role` only has SELECT on `profiles`, `practice_logs` and `user_practices` (UPDATE/DELETE were revoked), so the service role can read and verify but not clean up.
+- **Fix:** A was reset by hand via the Supabase MCP (SQL, exact pre-run snapshot). The code now has `AdminData` (service-role reads only) and `Cleanup` (restores as the data's owner, through RLS). Cleanup verifies each restore and fails loudly with "manual reset needed" if the app refuses it.
+- **How I verified:** SQL snapshot of A before and after the write run is identical (punya 121, streak 0, 20 logs, 3 streak events, practices unchanged).
+- **Lesson:** check what your "admin" credential can actually do before you rely on it for cleanup, and make cleanup verify itself; a silent leftover on production data is worse than a red build.
+- **Note:** T8's profile restore only works because of the T15 bug (users can edit their own punya/streak). When the app is fixed, T8 cleanup needs another route (e.g. a cleanup RPC for the test account).

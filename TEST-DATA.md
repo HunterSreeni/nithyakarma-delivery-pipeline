@@ -64,24 +64,32 @@ Expected column = derived from the policies above. Observed 2026-10-11 by SQL Ed
 |---|---|---|---|---|
 | T1-T4 | Public login page, auth API | nothing | no | n/a |
 | T5-T7 | A's dashboard, panchangam | nothing | no | n/a |
-| T8 | A's sandhya slots | marks one slot for today | yes | unmark the same slot |
-| T9 | A's profile | leaderboard opt-in toggle | yes | toggle back to original value |
+| T8 | A's sandhya slots; snapshot of A's profile + sandhya practice (service role) | marks Morning via RPC `submit_practice_log` (log + punya + streaks) | yes | as A: delete the new log, restore practice + profile fields. Fails loudly if a streak event was created or a restore is refused |
+| T9 | A's profile | leaderboard opt-in toggle | yes | toggled back in the UI; safety net as A via the API |
 | T10 | A's dashboard (one request blocked by BiDi) | nothing | no | n/a |
 | T11 | A's rows, attempted read of B's rows | nothing | no | n/a |
-| T12 | B's row (via service role, to confirm unchanged) | attempted update/insert on B's data (should be blocked) | yes | if RLS fails: restore B from baseline via service role |
+| T12 | B's row (via service role, to confirm unchanged) | attempted update/insert on B's data (should be blocked) | yes | if RLS ever fails: B restores their own row (B's session) |
 | T13 | A's children, attempted read of B's children | nothing | no | n/a |
 | T14 | A's session | nothing (logout) | no | n/a |
-| T15 | A's profile (via service role, before/after) | attempted PATCH of A's own `punya` / `ad_free_until` (should be rejected) | yes | restore original values via service role (needed while the bug exists) |
+| T15 | A's profile (via service role, before/after) | attempted PATCH of A's own `punya` / `ad_free_until` (should be rejected) | yes | A restores the original values (possible only while the bug exists). Runs only via `testng-known-bugs.xml` |
 
 ## Manual reset (if a run dies midway)
 
-<!-- Step-by-step: how to put A and B back to their baseline state by hand in the app or Supabase dashboard -->
+Cleanup runs **as the data owner**, because the service role is read-only on the app tables (BUGLOG #6). If a write test fails with "manual reset needed":
+
+1. In the Supabase SQL Editor, compare A with the baseline values below.
+2. Delete A's `practice_logs` rows created during the run (`created_at` after the run started).
+3. Set A's `profiles` punya / current_streak / last_complete_date, and A's own Sandhyavandhanam `user_practices` row, back to the baseline values.
+4. Check `leaderboard_opt_in` for A and B.
+5. Log it in BUGLOG.md.
 
 ## Baseline state
 
-Recorded 2026-10-11. Every run must leave A and B exactly like this.
+Recorded 2026-10-11, corrected from the database 2026-10-13. Every run must leave A and B exactly like this.
 
 | User | Children | Tracked anushtanams | Leaderboard opt-in | Today's sandhya slots |
 |---|---|---|---|---|
-| A | 4 | 4 | ON | unmarked before a run |
+| A | 4 | 6 rows: 5 for A (incl. Sandhyavandhanam) + 1 for a child | **OFF** (database; was noted as ON) | unmarked before a run |
 | B | 2 | 5 | ON | not touched by tests |
+
+**A, database values 2026-10-13:** punya 121, current_streak 0, best_streak 2, last_complete_date 2026-10-03, freeze_credits 2, ad_free_until 2027-11-07, 20 practice logs, 3 streak events. Sandhya practice row: current_streak 0, best_streak 2, last_log_date 2026-10-03.

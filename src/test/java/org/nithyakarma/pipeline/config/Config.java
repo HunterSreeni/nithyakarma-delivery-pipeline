@@ -30,6 +30,21 @@ public final class Config {
     public static boolean allowDataWrites() {
         return Boolean.parseBoolean(optional("E2E_ALLOW_DATA_WRITES", "false"));
     }
+
+    // empty = local Chrome; set to the Selenium URL in Docker/K8s, e.g. http://localhost:4444
+    public static String remoteUrl() {
+        return optional("SELENIUM_REMOTE_URL", "");
+    }
+
+    // HEADLESS=false opens a visible browser for local debugging
+    public static boolean headless() {
+        return Boolean.parseBoolean(optional("HEADLESS", "true"));
+    }
+
+    // where scrubbed console logs go; the K8s Job mounts /reports
+    public static String reportsDir() {
+        return optional("REPORTS_DIR", "reports");
+    }
     private static String required(String name) {
         String value = System.getenv(name);
         if (value == null || value.isBlank()) {

@@ -3,6 +3,12 @@
 <!-- <test> blocks run top to bottom -->
 <suite name="nithyakarma-delivery-pipeline">
 <test name="regression">
+    <groups>
+        <run>
+            <!-- T15 fails until the app bug is fixed; run it with testng-known-bugs.xml -->
+            <exclude name="known-bug"/>
+        </run>
+    </groups>
     <packages>
         <package name="org.nithyakarma.pipeline.tests"/>
     </packages>
