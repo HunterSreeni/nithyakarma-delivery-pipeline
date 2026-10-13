@@ -13,6 +13,8 @@ This file is the raw material for the case study.
 | 4 | 2026-10-11 | 0 | test data | RLS probe ran as the wrong user |
 | 5 | 2026-10-13 | 1 | BiDi | Request intercept hung the test for 4 minutes |
 | 6 | 2026-10-13 | 1 | test data | Write-test cleanup refused (HTTP 403) |
+| 7 | 2026-10-13 | 3 | docker | Chrome container started without its ports |
+| 8 | 2026-10-13 | 3 | shell | PowerShell broke Maven `-D` arguments |
 
 ---
 
@@ -83,3 +85,21 @@ This file is the raw material for the case study.
 - **How I verified:** SQL snapshot of A before and after the write run is identical (punya 121, streak 0, 20 logs, 3 streak events, practices unchanged).
 - **Lesson:** check what your "admin" credential can actually do before you rely on it for cleanup, and make cleanup verify itself; a silent leftover on production data is worse than a red build.
 - **Note:** T8's profile restore only works because of the T15 bug (users can edit their own punya/streak). When the app is fixed, T8 cleanup needs another route (e.g. a cleanup RPC for the test account).
+
+### 7. Chrome container started without its ports
+- **Date:** 2026-10-13
+- **Phase:** 3
+- **Symptom:** `docker run ... -p 4444:4444 ... nk-chrome` -> `Bind for 0.0.0.0:4444 failed: port is already allocated`. After freeing the port, `docker start nk-chrome` ran, but `docker ps` showed `4444/tcp` instead of `0.0.0.0:4444->4444/tcp`.
+- **Cause:** a stray `selenium/standalone-chrome:latest` container (random name) already held 4444/7900. `docker run` = create + start: the create succeeded, the start failed at port binding, and restarting that half-made container did not publish the ports.
+- **Fix:** removed the stray container, then `docker rm -f nk-chrome` and ran the full `docker run` again.
+- **How I verified:** `docker ps` -> `0.0.0.0:4444->4444/tcp`; `curl.exe -s http://localhost:4444/status` -> `"ready": true`.
+- **Lesson:** a failed `docker run` can leave a container in the Created state (`docker ps -a`); recreate it rather than restart it. Pin image tags, never `latest`.
+
+### 8. PowerShell broke Maven `-D` arguments
+- **Date:** 2026-10-13
+- **Phase:** 3
+- **Symptom:** `mvn test -Dtest=DashboardTest -Dsurefire.failIfNoSpecifiedTests=false` -> `Unknown lifecycle phase ".failIfNoSpecifiedTests=false"`. With `-Dtest=DashboardTest,ResilienceTest` -> `Missing argument in parameter list`.
+- **Cause:** PowerShell parses the whole line before any program sees it: an unquoted `-D` argument is split at the first dot, and a comma is read as an array operator. Earlier runs used Git Bash, which does not do this. It applies to arguments passed through `docker run` too.
+- **Fix:** quote those arguments: `"-Dsurefire.failIfNoSpecifiedTests=false"`, `"-Dtest=DashboardTest,ResilienceTest"`. RUNBOOK commands updated.
+- **How I verified:** both commands ran; DashboardTest + ResilienceTest passed (4/4) in a `maven` container against `nk-chrome`.
+- **Lesson:** the shell is part of the pipeline; write commands for the shell the CI agent actually uses (Jenkins on Linux = sh).
