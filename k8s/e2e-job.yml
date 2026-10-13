@@ -17,6 +17,12 @@ spec:
           env:
             - name: TZ
               value: Asia/Kolkata
+            - name: SE_NODE_MAX_SESSIONS  #DAG suite keeps several class browsers open at once.
+              value: "4"        
+            - name: SE_NODE_OVERRIDE_MAX_SESSIONS  # allow more sessions than the 2 CPUs it detects
+              value: "true" 
+            - name: SE_NODE_SESSION_TIMEOUT  # default = 30s, but DAG suite; an idle class browser waits while otehr classes run
+              value: "900"   
           startupProbe:          # runner starts only after the Grid answers
             httpGet:
               path: /status
@@ -30,9 +36,12 @@ spec:
         - name: runner
           image: nk-runner:0.1.0
           imagePullPolicy: IfNotPresent
+          args: ["mvn", "-B", "test", "-Dsuite=$(SUITE)"]
           envFrom:
             - secretRef:
-                name: nk-env     # the K8s version of --env-file
+                name: nk-env     # the secrets in jenkins global
+            - configMapRef:
+                name: nk-run     # trun settings: SUITE, E2E_ALLOW_DATA_WRITES (listed last = wins)
           env:
             - name: SELENIUM_REMOTE_URL
               value: http://localhost:4444   # same pod = same network

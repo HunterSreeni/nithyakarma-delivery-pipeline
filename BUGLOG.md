@@ -16,6 +16,7 @@ This file is the raw material for the case study.
 | 7 | 2026-10-13 | 3 | docker | Chrome container started without its ports |
 | 8 | 2026-10-13 | 3 | shell | PowerShell broke Maven `-D` arguments |
 | 9 | 2026-10-13 | 4 | kind | `kind load` failed for the Chrome image |
+| 10 | 2026-10-13 | 5 | selenium grid | DAG suite timed out on a one-session Chrome |
 
 ---
 
@@ -113,3 +114,12 @@ This file is the raw material for the case study.
 - **Fix:** let the node pull the image itself: `docker exec nk-control-plane crictl pull selenium/standalone-chrome:4.49.0-20260909`. The Job uses `imagePullPolicy: IfNotPresent`.
 - **How I verified:** `docker exec nk-control-plane crictl images` lists both images; the Job ran 22 / 19 passed / 3 skipped.
 - **Lesson:** a kind node is a container running containerd; `docker exec` + `crictl` work on it like SSH on a real node. `kind load` suits locally built images; public multi-platform images are simpler to pull on the node.
+
+### 10. DAG suite timed out on a one-session Chrome
+- **Date:** 2026-10-13
+- **Phase:** 5
+- **Symptom:** Job with `SUITE=testng-dag.xml` ended in `Error` after ~7 min: `SandhyaTest.startBrowser` -> `SessionNotCreatedException ... TimeoutException` (180s), `DashboardTest` -> `NoSuchSession ... session timed out due to inactivity`, BiDi `LogInspector` timeouts. The regression suite passed on the same setup.
+- **Cause:** `selenium/standalone-chrome` defaults to `max-sessions = 1` and `session-timeout = 300` (sidecar log). Regression runs class by class, so only one browser is open at a time. The DAG suite orders by group across classes: DashboardTest keeps its browser open from T5 (`session`) until T6/T7 (`features`), while other `features` classes open their own browsers. The second session request queued until it timed out, and the idle first session was reaped. Locally each class starts its own ChromeDriver, so there was no limit.
+- **Fix:** Chrome sidecar env: `SE_NODE_MAX_SESSIONS=4`, `SE_NODE_OVERRIDE_MAX_SESSIONS=true` (the node detects 2 CPUs), `SE_NODE_SESSION_TIMEOUT=900`.
+- **How I verified:** same Job, DAG suite: 22 run, 0 failures, 4 skipped, `Completed` in ~70s.
+- **Lesson:** a remote Grid enforces limits a local driver never shows (session slots, idle timeouts). Size the Grid for the suite that holds the most browsers open at once, not the default suite.
