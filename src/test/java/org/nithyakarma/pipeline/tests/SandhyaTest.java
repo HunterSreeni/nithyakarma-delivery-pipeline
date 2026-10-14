@@ -24,7 +24,7 @@ public class SandhyaTest extends LoggedInUiTestBase {
     private static final String PROFILE_FIELDS = "punya,current_streak,best_streak,last_complete_date,freeze_credits";
     private static final String PRACTICE_FIELDS = "current_streak,best_streak,last_log_date,sequence_position";
 
-    @Test(groups = "features")
+    @Test(groups = "writes")
     public void markingMorningSandhyaSavesOneLog() {
         if (!Config.allowDataWrites()) {
             throw new SkipException("writes are off (set E2E_ALLOW_DATA_WRITES=true)");

@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 // T9: flip the leaderboard toggle, prove it survived a reload AND reached the database, flip it back
 public class LeaderboardTest extends LoggedInUiTestBase {
 
-    @Test(groups = "features")
+    @Test(groups = "writes")
     public void leaderboardToggleIsSavedAndRestored() {
         if (!Config.allowDataWrites()) {
             throw new SkipException("writes are off (set E2E_ALLOW_DATA_WRITES=true)");

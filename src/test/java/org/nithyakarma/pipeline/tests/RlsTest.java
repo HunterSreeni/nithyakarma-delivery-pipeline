@@ -46,7 +46,7 @@ public class RlsTest {
     }
 
     // T12 (attempts writes; they must all be refused)
-    @Test(groups = "features")
+    @Test(groups = "writes")
     public void userCannotWriteAnotherUsersData() {
         if (!Config.allowDataWrites()) {
             throw new SkipException("writes are off (set E2E_ALLOW_DATA_WRITES=true)");

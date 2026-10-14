@@ -2,7 +2,10 @@
 <!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
 <!-- DAG demo: the SAME test code as regression, but group dependencies are declared here,
      so ordering and skipping only exist in this suite.
-     public (T1-T4) -> session (T5) -> features (T6-T13) -> logout (T14)
+     public (T1-T4) -> session (T5) -> features (T6, T7, T10, T11, T13) -> logout (T14)
+                                    -> writes (T8, T9, T12)
+     writes is a side branch: those tests skip when writes are off, and in a DAG a skip
+     counts as "not successful", so logout must not depend on them.
      Break T5 on purpose:  mvn test -Dsuite=testng-dag.xml -Ddag.breakSession=true
      Expected: T5 FAILED, T6-T14 SKIPPED. -->
 <suite name="nithyakarma-dag-demo">
@@ -11,6 +14,7 @@
         <dependencies>
             <group name="session" depends-on="public"/>
             <group name="features" depends-on="session"/>
+            <group name="writes" depends-on="session"/>
             <group name="logout" depends-on="features"/>
         </dependencies>
         <run>

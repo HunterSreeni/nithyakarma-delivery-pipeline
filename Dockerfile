@@ -8,6 +8,7 @@ RUN mvn -B -q dependency:go-offline
 # 2. then the code, which changes often
 COPY src ./src
 COPY testng-*.xml ./
+RUN mvn -B -q test-compile
 
 ENV REPORTS_DIR=/work/reports
 CMD ["mvn", "-B", "test"]
