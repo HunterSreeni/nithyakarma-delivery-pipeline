@@ -10,6 +10,7 @@ pipeline {
     parameters {
         choice(name: 'SUITE', choices: ['testng-regression.xml', 'testng-dag.xml'], description: 'TestNG suite')
         booleanParam(name: 'E2E_ALLOW_DATA_WRITES', defaultValue: false, description: 'Run write tests T8, T9, T12 (production test accounts)')
+        booleanParam(name: 'DEMO_EXPECTED_FAILURE', defaultValue: false, description: 'Make CanaryTest fail on purpose (demo of a red build, labelled as such)')
     }
 
     environment {
@@ -19,6 +20,7 @@ pipeline {
         // a new job learns its parameters only during build #1, so params are empty then: fall back to the safe defaults
         RUN_SUITE  = "${params.SUITE ?: 'testng-regression.xml'}"
         RUN_WRITES = "${params.E2E_ALLOW_DATA_WRITES ?: false}"
+        RUN_DEMO   = "${params.DEMO_EXPECTED_FAILURE ?: false}"
     }
 
     stages {
@@ -57,7 +59,7 @@ pipeline {
                     '''
                 }
                 // run settings are not secrets: they go in a ConfigMap
-                sh 'kubectl -n "$NS" create configmap nk-run --from-literal=SUITE="$RUN_SUITE" --from-literal=E2E_ALLOW_DATA_WRITES="$RUN_WRITES" --dry-run=client -o yaml | kubectl apply -f -'
+                sh 'kubectl -n "$NS" create configmap nk-run --from-literal=SUITE="$RUN_SUITE" --from-literal=E2E_ALLOW_DATA_WRITES="$RUN_WRITES" --from-literal=DEMO_EXPECTED_FAILURE="$RUN_DEMO" --dry-run=client -o yaml | kubectl apply -f -'
             }
         }
 
@@ -79,6 +81,12 @@ pipeline {
 
     post {
         always {
+            script {
+                // a demo red must never be mistaken for a real failure
+                if (env.RUN_DEMO == 'true') {
+                    currentBuild.description = 'INTENTIONAL RED - demo'
+                }
+            }
             // collect reports FIRST, delete the Job LAST.
             // Jenkins cannot see the D:\ drive, so copy them out of the kind node.
             sh '''

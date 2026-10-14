@@ -31,6 +31,11 @@ public final class Config {
         return Boolean.parseBoolean(optional("E2E_ALLOW_DATA_WRITES", "false"));
     }
 
+    // true = CanaryTest fails on purpose, to demo a red pipeline (Jenkins labels that build)
+    public static boolean demoExpectedFailure() {
+        return Boolean.parseBoolean(optional("DEMO_EXPECTED_FAILURE", "false"));
+    }
+
     // empty = local Chrome; set to the Selenium URL in Docker/K8s, e.g. http://localhost:4444
     public static String remoteUrl() {
         return optional("SELENIUM_REMOTE_URL", "");

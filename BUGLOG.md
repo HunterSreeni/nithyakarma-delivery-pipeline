@@ -131,5 +131,5 @@ This file is the raw material for the case study.
 - **Symptom:** Jenkins build #1 -> ConfigMap created with `SUITE=` and `E2E_ALLOW_DATA_WRITES=` (empty); Maven in the pod: `testSuiteXmlFiles0 has null value`, `Tests run: 0`, build FAILURE.
 - **Cause:** a Pipeline job reads the `parameters {}` block from the Jenkinsfile only while build #1 runs, so build #1 has no parameter values at all (not even the defaults).
 - **Fix:** the Jenkinsfile falls back to the safe defaults itself: `RUN_SUITE = params.SUITE ?: testng-regression.xml`, `RUN_WRITES = params.E2E_ALLOW_DATA_WRITES ?: false`, and the ConfigMap uses those.
-- **How I verified:** (fill after the next build) ConfigMap line shows `SUITE=testng-regression.xml`, 22 run / 19 passed / 3 skipped.
+- **How I verified:** Jenkins build #2 (defaults): ConfigMap `SUITE=testng-regression.xml`, `E2E_ALLOW_DATA_WRITES=false`; 22 run, 19 passed, 3 skipped; SUCCESS.
 - **Lesson:** never trust that a CI parameter has a value; default it in code to the safe option. The pipeline still did its job: the empty run failed red instead of passing with 0 tests.

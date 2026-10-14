@@ -34,7 +34,7 @@ How to run the suite at each layer. Fill each section when its phase lands.
 - **Enable writes:** `$env:E2E_ALLOW_DATA_WRITES="true"` (T8, T9, T12 run instead of skipping; they restore A afterwards)
 - **Watch the browser:** `$env:HEADLESS="false"`
 - **Expected result (2026-10-13):**
-  - Regression, writes off: 22 run (T2 counts 7 rows), 19 passed, 3 skipped (T8, T9, T12).
+  - Regression, writes off: 23 run (T2 counts 7 rows, + CanaryTest from 2026-10-14), 20 passed, 3 skipped (T8, T9, T12).
   - Writes on: T8, T9, T12 pass, and A matches the TEST-DATA baseline afterwards.
   - DAG with break: T5 FAILED, T6-T14 SKIPPED.
 - **Reports at:** `target/surefire-reports/` (TestNG + JUnit XML); scrubbed browser console of failed UI tests in `reports/console/`
@@ -49,7 +49,7 @@ How to run the suite at each layer. Fill each section when its phase lands.
 - **Check image for secrets:** `docker run --rm nk-runner:0.1.0 ls -a /work` (no `.env`) and `docker history --no-trunc nk-runner:0.1.0` (only Dockerfile steps)
 - **Run suite:** `docker run --rm --network nk-net --env-file .env -e SELENIUM_REMOTE_URL=http://nk-chrome:4444 -v "${PWD}\reports:/work/reports" -v "${PWD}\target\docker-surefire:/work/target/surefire-reports" nk-runner:0.1.0`
   - Other suite: append `mvn -B test "-Dsuite=testng-dag.xml"` after the image name
-- **Expected result (2026-10-13):** 22 run, 19 passed, 3 skipped. Results in `target\docker-surefire\`.
+- **Expected result (2026-10-13):** 22 run, 19 passed, 3 skipped (23 / 20 / 3 once CanaryTest is in the image). Results in `target\docker-surefire\`.
 - **Tear down:** `docker rm -f nk-chrome`; `docker network rm nk-net`
 
 ## Kubernetes
@@ -62,15 +62,19 @@ How to run the suite at each layer. Fill each section when its phase lands.
 - **Wait for result:** `kubectl -n nk-e2e get pods -w`, then `kubectl -n nk-e2e get job nk-e2e` -> `Complete` (tests failed -> `Failed`; `backoffLimit: 0`, never auto-retried)
 - **Get logs:** `kubectl -n nk-e2e logs -f job/nk-e2e -c runner`
 - **Reports at:** repo `reports\surefire\` (TestNG/JUnit XML + HTML) and `reports\console\` (via node mount `/reports`, kind-config.yml)
-- **Expected result (2026-10-13):** 22 run, 19 passed, 3 skipped, ~80s (Chrome is a native sidecar on `localhost:4444`)
+- **Expected result (2026-10-13):** 22 run, 19 passed, 3 skipped (23 / 20 / 3 with CanaryTest), ~80s (Chrome is a native sidecar on `localhost:4444`)
 - **Clean up:** `kubectl -n nk-e2e delete job nk-e2e`
 
 ## Jenkins
 
-- **Start Jenkins:**
-- **Parameters:** `SUITE`, `E2E_ALLOW_DATA_WRITES`, `DEMO_EXPECTED_FAILURE`
-- **Expected result:**
-- **Artifacts:**
+- **Image (once, or after editing `jenkins\Dockerfile`):** `docker build -t nk-jenkins:0.1.0 jenkins`
+- **First start:** `docker volume create nk-jenkins-home`, then `docker run -d --name nk-jenkins --network kind --group-add 0 -p 8080:8080 -v nk-jenkins-home:/var/jenkins_home -v /var/run/docker.sock:/var/run/docker.sock nk-jenkins:0.1.0`; `docker update --restart unless-stopped nk-jenkins`
+- **After a reboot:** start Docker Desktop; Jenkins restarts by itself (else `docker start nk-jenkins`). Open `http://localhost:8080`
+- **Credentials (Manage Jenkins > Credentials > System > Global):** Secret text `nk-base-url`, `nk-supabase-url`, `nk-publishable-key`, `nk-service-role-key`, `nk-user-a-email`, `nk-user-b-email`; Secret file `nk-kubeconfig` from `kind get kubeconfig --internal --name nk | Out-File -Encoding ascii $env:TEMP\nk-kubeconfig` (delete the local file after upload)
+- **Job:** Pipeline `nk-e2e`, Pipeline script from SCM, Git `https://github.com/HunterSreeni/nithyakarma-delivery-pipeline.git`, branch `*/main`, script `Jenkinsfile`
+- **Parameters:** `SUITE` (regression / dag), `E2E_ALLOW_DATA_WRITES` (false), `DEMO_EXPECTED_FAILURE` (false). All default to the safe value, even on build #1 (BUGLOG #11)
+- **Expected result (2026-10-14):** defaults -> SUCCESS, 22 run / 19 passed / 3 skipped (23 / 20 / 3 with CanaryTest). `DEMO_EXPECTED_FAILURE=true` -> FAILURE, only CanaryTest failed, build description "INTENTIONAL RED - demo"
+- **Artifacts:** build page > Test Result (JUnit) and Build Artifacts `job-reports/surefire/` (+ `job-reports/console/` when a UI test failed). The Job is deleted only after these are archived.
 
 ## Troubleshooting
 
