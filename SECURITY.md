@@ -8,10 +8,10 @@ The Supabase service-role key bypasses Row Level Security and has full access to
 
 | Secret | What it grants | Who/what uses it | Sensitivity |
 |---|---|---|---|
-| `SUPABASE_SERVICE_ROLE_KEY` | Full DB read/write, bypasses RLS; admin auth API (mint magic links) | Test setup/cleanup only: create sessions, look up user B's IDs, verify B's rows unchanged, restore state | **High** |
+| `SUPABASE_SERVICE_ROLE_KEY` | Bypasses RLS; admin auth API (mint magic links). In this project it is SELECT-only on the app tables (BUGLOG #6) | Test setup and verification only: create sessions, snapshot rows, verify B's rows unchanged. Cleanup runs as the data owner, not as service role | **High** |
 | `SUPABASE_PUBLISHABLE_KEY` | Identifies the project to the API; everything else is limited by RLS. Public by design (ships in the app's browser bundle) | REST Assured requests (`apikey` header), session setup | Low (still kept out of Git for hygiene) |
 | User A / B session tokens (JWTs) | Act as that user until expiry | Minted at runtime per test class, held in memory only | **High** while valid |
-| GHCR push token | Push images to the GitHub Container Registry | Jenkins image push stage (Phase 6) | Medium |
+| User A / B emails | Identify the test accounts (PII) | Session setup | Medium |
 | SonarQube token | Submit analysis to SonarQube | Jenkins Sonar stage (Phase 6) | Low (local Sonar only) |
 | kubeconfig | Admin access to the local kind cluster | Jenkins deploy/run stages | Medium (local cluster only) |
 
@@ -19,10 +19,11 @@ The Supabase service-role key bypasses Row Level Security and has full access to
 
 | Secret | Local | Docker | Kubernetes | Jenkins credential ID |
 |---|---|---|---|---|
-| `SUPABASE_SERVICE_ROLE_KEY` | `.env` (git-ignored) | `--env-file .env` at `docker run`, never `ENV` in Dockerfile | Secret `nk-test-secrets`, injected as env | `nk-supabase-service-role` (Secret text) |
-| `SUPABASE_PUBLISHABLE_KEY` | `.env` | runtime env | Secret `nk-test-secrets` | `nk-supabase-publishable` (Secret text) |
+| `SUPABASE_SERVICE_ROLE_KEY` | `.env` (git-ignored) | `--env-file .env` at `docker run`, never `ENV` in Dockerfile | Secret `nk-env` (`envFrom`) | `nk-service-role-key` (Secret text) |
+| `SUPABASE_PUBLISHABLE_KEY` | `.env` | runtime env | Secret `nk-env` | `nk-publishable-key` (Secret text) |
+| `SUPABASE_URL`, `BASE_URL` | `.env` | runtime env | Secret `nk-env` | `nk-supabase-url`, `nk-base-url` (Secret text) |
+| User A / B emails | `.env` | runtime env | Secret `nk-env` | `nk-user-a-email`, `nk-user-b-email` (Secret text) |
 | User A / B JWTs | memory only | memory only | memory only | never stored |
-| GHCR push token | not needed | `docker login` on the Jenkins host only | not needed (public package) | `nk-ghcr-token` (Username + password) |
 | SonarQube token | not needed | not needed | not needed | `nk-sonar-token` (Secret text) |
 | kubeconfig | `~/.kube/config` (from kind) | not needed | not applicable | `nk-kubeconfig` (Secret file, internal kind address) |
 
@@ -48,7 +49,7 @@ The Kubernetes Secret is created by Jenkins from its credentials on every run (`
 | Jenkins masks credentials in logs | `withCredentials` bindings only | Search build logs for key prefixes |
 | Token scrubber on console/network captures | Scrubber runs before any capture is written to reports | Unit test feeds a fake JWT, `apikey` header and magic link, asserts all redacted |
 | Raw captures never archived | Raw files stay in the pod / temp folder; only scrubbed files archived | Inspect archived artifacts after each phase |
-| Service role for setup/cleanup only | Assertions use user A/B JWTs | Code review; RLS tests proven to fail when pointed at A's own data |
+| Service role for setup/verification only | Assertions and cleanup use user A/B JWTs | Code review; RLS tests proven to fail when pointed at A's own data |
 | Writes off by default | `E2E_ALLOW_DATA_WRITES=false` locally and in Jenkins | Default build run shows write tests SKIPPED |
 
 ## If a secret leaks
