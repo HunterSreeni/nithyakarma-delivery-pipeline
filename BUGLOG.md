@@ -17,6 +17,7 @@ This file is the raw material for the case study.
 | 8 | 2026-10-13 | 3 | shell | PowerShell broke Maven `-D` arguments |
 | 9 | 2026-10-13 | 4 | kind | `kind load` failed for the Chrome image |
 | 10 | 2026-10-13 | 5 | selenium grid | DAG suite timed out on a one-session Chrome |
+| 11 | 2026-10-14 | 5 | jenkins | First build ran with empty parameters |
 
 ---
 
@@ -123,3 +124,12 @@ This file is the raw material for the case study.
 - **Fix:** Chrome sidecar env: `SE_NODE_MAX_SESSIONS=4`, `SE_NODE_OVERRIDE_MAX_SESSIONS=true` (the node detects 2 CPUs), `SE_NODE_SESSION_TIMEOUT=900`.
 - **How I verified:** same Job, DAG suite: 22 run, 0 failures, 4 skipped, `Completed` in ~70s.
 - **Lesson:** a remote Grid enforces limits a local driver never shows (session slots, idle timeouts). Size the Grid for the suite that holds the most browsers open at once, not the default suite.
+
+### 11. First build ran with empty parameters
+- **Date:** 2026-10-14
+- **Phase:** 5
+- **Symptom:** Jenkins build #1 -> ConfigMap created with `SUITE=` and `E2E_ALLOW_DATA_WRITES=` (empty); Maven in the pod: `testSuiteXmlFiles0 has null value`, `Tests run: 0`, build FAILURE.
+- **Cause:** a Pipeline job reads the `parameters {}` block from the Jenkinsfile only while build #1 runs, so build #1 has no parameter values at all (not even the defaults).
+- **Fix:** the Jenkinsfile falls back to the safe defaults itself: `RUN_SUITE = params.SUITE ?: testng-regression.xml`, `RUN_WRITES = params.E2E_ALLOW_DATA_WRITES ?: false`, and the ConfigMap uses those.
+- **How I verified:** (fill after the next build) ConfigMap line shows `SUITE=testng-regression.xml`, 22 run / 19 passed / 3 skipped.
+- **Lesson:** never trust that a CI parameter has a value; default it in code to the safe option. The pipeline still did its job: the empty run failed red instead of passing with 0 tests.

@@ -16,6 +16,9 @@ pipeline {
         IMAGE      = "nk-runner:${env.BUILD_NUMBER}"
         KUBECONFIG = credentials('nk-kubeconfig')   // file credential -> path to a temp copy
         NS         = 'nk-e2e'
+        // a new job learns its parameters only during build #1, so params are empty then: fall back to the safe defaults
+        RUN_SUITE  = "${params.SUITE ?: 'testng-regression.xml'}"
+        RUN_WRITES = "${params.E2E_ALLOW_DATA_WRITES ?: false}"
     }
 
     stages {
@@ -54,7 +57,7 @@ pipeline {
                     '''
                 }
                 // run settings are not secrets: they go in a ConfigMap
-                sh 'kubectl -n "$NS" create configmap nk-run --from-literal=SUITE="$SUITE" --from-literal=E2E_ALLOW_DATA_WRITES="$E2E_ALLOW_DATA_WRITES" --dry-run=client -o yaml | kubectl apply -f -'
+                sh 'kubectl -n "$NS" create configmap nk-run --from-literal=SUITE="$RUN_SUITE" --from-literal=E2E_ALLOW_DATA_WRITES="$RUN_WRITES" --dry-run=client -o yaml | kubectl apply -f -'
             }
         }
 
