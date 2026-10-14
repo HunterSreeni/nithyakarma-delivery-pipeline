@@ -14,10 +14,10 @@ Companion to Quality Lab: Quality Lab compares Playwright and Selenium test cove
 | 3 | Docker: runner image + Selenium standalone Chrome on a Docker network | done |
 | 4 | Kubernetes: suite as a kind Job with a native Chrome sidecar | done |
 | 5 | Jenkins: parameterised pipeline, green + labelled intentional red build | done |
-| 6 | SonarQube analysis + quality gate | in progress |
-| 7 | Docs + case study | |
+| 6 | SonarQube analysis + quality gate | parked (future work) |
+| 7 | Docs + case study | done |
 
-Future work (deliberately out of scope for now): Trivy image scan, GHCR registry push, see [Future work](#future-work).
+Future work (deliberately out of scope for now): SonarQube quality gate, Trivy image scan, GHCR registry push, see [Future work](#future-work).
 
 ## Architecture
 
@@ -113,6 +113,7 @@ The suite runs against **production data** with two dedicated accounts, writes o
 
 ## Future work
 
+- **SonarQube:** static analysis plus a quality gate stage that waits on the Sonar webhook. The framework code lives in `src/test/java`, so the analysis must point `sonar.sources` there.
 - **Trivy:** scan the runner image and fail the build on CRITICAL vulnerabilities.
 - **GHCR:** push images tagged with build number + git SHA; the Job pulls that tag.
 - Bump Selenium to 4.51 when a matching Grid image is published.
@@ -121,3 +122,5 @@ The suite runs against **production data** with two dedicated accounts, writes o
 ## Lessons
 
 Every problem hit while building this, with cause, fix and verification: [BUGLOG.md](BUGLOG.md).
+
+Case study: [hunter-sreeni.netlify.app/case-studies/delivery-pipeline.html](https://hunter-sreeni.netlify.app/case-studies/delivery-pipeline.html)

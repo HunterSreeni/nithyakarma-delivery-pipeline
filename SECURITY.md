@@ -12,7 +12,7 @@ The Supabase service-role key bypasses Row Level Security and has full access to
 | `SUPABASE_PUBLISHABLE_KEY` | Identifies the project to the API; everything else is limited by RLS. Public by design (ships in the app's browser bundle) | REST Assured requests (`apikey` header), session setup | Low (still kept out of Git for hygiene) |
 | User A / B session tokens (JWTs) | Act as that user until expiry | Minted at runtime per test class, held in memory only | **High** while valid |
 | User A / B emails | Identify the test accounts (PII) | Session setup | Medium |
-| SonarQube token | Submit analysis to SonarQube | Jenkins Sonar stage (Phase 6) | Low (local Sonar only) |
+| SonarQube token | Submit analysis to SonarQube | Jenkins Sonar stage (future work, not set up yet) | Low (local Sonar only) |
 | kubeconfig | Admin access to the local kind cluster | Jenkins deploy/run stages | Medium (local cluster only) |
 
 ## Where each secret lives, per layer
@@ -24,7 +24,7 @@ The Supabase service-role key bypasses Row Level Security and has full access to
 | `SUPABASE_URL`, `BASE_URL` | `.env` | runtime env | Secret `nk-env` | `nk-supabase-url`, `nk-base-url` (Secret text) |
 | User A / B emails | `.env` | runtime env | Secret `nk-env` | `nk-user-a-email`, `nk-user-b-email` (Secret text) |
 | User A / B JWTs | memory only | memory only | memory only | never stored |
-| SonarQube token | not needed | not needed | not needed | `nk-sonar-token` (Secret text) |
+| SonarQube token (future work) | not needed | not needed | not needed | `nk-sonar-token` (Secret text, when added) |
 | kubeconfig | `~/.kube/config` (from kind) | not needed | not applicable | `nk-kubeconfig` (Secret file, internal kind address) |
 
 The Kubernetes Secret is created by Jenkins from its credentials on every run (`kubectl create secret ... --dry-run=client -o yaml | kubectl apply -f -`). No Secret manifest with real values is ever committed.
